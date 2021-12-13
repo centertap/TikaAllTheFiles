@@ -1,0 +1,74 @@
+{
+    "name": "TikaAllTheFiles",
+    "version": "1.0.0",
+    "author": [ "Matt Marjanović" ],
+    "url": "https://github.com/centertap/TikaAllTheFiles",
+    "descriptionmsg": "tatf-desc",
+    "type": "media",
+    "license-name": "GPL-3.0-or-later",
+    "requires": {
+        "MediaWiki": ">=1.35.0",
+        "extensions": {
+        },
+        "platform": {
+            "php": ">=7.4.0"
+        }
+    },
+    "ConfigRegistry": {
+      "TikaAllTheFiles": "GlobalVarConfig::newInstance"
+    },
+    "config_prefix": "wg",
+    "config": {
+      "TikaAllTheFiles_TikaServiceBaseUrl": {
+        "value": "http://localhost:9998/",
+        "description": "Base URL of the Tika server"
+      },
+      "TikaAllTheFiles_QueryTimeoutSeconds": {
+        "value": 5,
+        "description": "Time limit (seconds) for receiving the response to a Tika query"
+      },
+      "TikaAllTheFiles_QueryRetryCount": {
+        "value": 2,
+        "description": "Number of times to retry a failed Tika query"
+      },
+      "TikaAllTheFiles_QueryRetryDelaySeconds": {
+        "value": 2,
+        "description": "Delay (seconds) before retrying a failed Tika query"
+      },
+      "TikaAllTheFiles_MimeTypeProfiles": {
+        "value": {
+          "defaults": {
+            "handler_strategy": "fallback",
+            "allow_ocr": false,
+            "ocr_languages": "",
+            "content_strategy": "combine",
+            "content_composition": "text",
+            "metadata_strategy": "prefer_other"
+          },
+          "*": "defaults"
+        },
+        "description": "Per mime-type definitions of handler profiles"
+      },
+      "TikaAllTheFiles_PropertyMap": {
+        "value": [],
+        "description": "Additional or override mappings for Tika metadata properties"
+      }
+    },
+    "MessagesDirs": {
+        "TikaAllTheFiles": [
+            "i18n"
+        ]
+    },
+    "AutoloadNamespaces": {
+        "MediaWiki\\Extension\\TikaAllTheFiles\\": "src/"
+    },
+    "HookHandlers": {
+      "TatfHooks": {
+        "class": "MediaWiki\\Extension\\TikaAllTheFiles\\Hooks"
+      }
+    },
+    "Hooks": {
+      "MediaWikiServices": "TatfHooks"
+    },
+    "manifest_version": 2
+}

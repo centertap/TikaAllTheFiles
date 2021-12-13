@@ -1,0 +1,6 @@
+{
+  "@metadata": {
+    "authors": [ "Matt Marjanovic" ]
+  },
+  "tatf-desc": "Using Apache Tika, provides text and metadata extraction for thousands of file types, enabling full-text search of any uploaded file"
+}

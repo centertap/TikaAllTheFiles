@@ -1,0 +1,55 @@
+{
+  "name": "centertap/tika-all-the-files",
+  "type": "mediawiki-extension",
+  "description": "Mediawiki extension that provides extraction of searchable text and metadata from uploaded files, via Apache Tika",
+  "keywords": [
+    "mediawiki",
+    "tika",
+    "metadata",
+    "text-extraction"
+  ],
+  "homepage": "https://github.com/centertap/TikaAllTheFiles",
+  "readme": "README.md",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Matt Marjanovic",
+      "email": "maddog@mir.com",
+      "role": "Creator"
+    },
+    {
+      "name": "Center for Transparent Analysis and Policy",
+      "email": "dothemath@centertap.org",
+      "homepage": "https://www.centertap.org/",
+      "role": "Maintainer"
+    }
+  ],
+  "funding": [
+    {
+      "type": "Donate to CTAP",
+      "url": "https://www.centertap.org/how"
+    }
+  ],
+  "require": {
+    "php": ">=7.4",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "composer/installers": "^1.0.1"
+  },
+  "require-dev": {
+    "php-parallel-lint/php-parallel-lint": ">=1.0.0",
+    "php-parallel-lint/php-console-highlighter": ">=0.3.2",
+    "mediawiki/mediawiki-codesniffer": ">=28.0.0",
+    "mediawiki/minus-x": ">=0.3.2"
+  },
+  "scripts": {
+    "test": [
+      "parallel-lint . --exclude vendor",
+      "phpcs -p -s",
+      "minus-x check ."
+    ],
+    "fix": [
+      "minus-x fix ."
+    ]
+  }
+}
