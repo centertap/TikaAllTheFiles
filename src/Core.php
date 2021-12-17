@@ -651,12 +651,17 @@ class Core {
         $options[CURLOPT_URL] = $tikaUrl . '/tika/text';
       }
 
+      // Hmm... If OCR is enabled, Tika appears to invoke Tesseract even if
+      // we only ask Tika for metadata (via '/meta')!  So, ensure that OCR
+      // (which is slow) is turned off when we only want metadata.
+      // TODO(maddog)  Check if this is a Tika bug and/or known behavior.
+      $allowOcr = $onlyMetadata ? false : $typeProfile->allowOcr;
       // See https://cwiki.apache.org/confluence/display/TIKA/TikaOCR
       //
       // Tika's default for skipOCR is 'false', but we always explicitly set
       // an overriding value via query header.
       $options[CURLOPT_HTTPHEADER][] =
-          'X-Tika-OCRskipOcr: ' . ( $typeProfile->allowOcr ? 'false' : 'true' );
+          'X-Tika-OCRskipOcr: ' . ( $allowOcr ? 'false' : 'true' );
 
       // Tika's default for ocrLanguages is 'eng'.  We only set a per-query
       // value if the profile provides a non-empty value to set.  Languages
