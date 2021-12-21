@@ -569,7 +569,7 @@ For example:
 $wgTikaAllTheFiles_MimeTypeProfiles['application/pdf'] = [
     'handler_strategy' => 'wrapping',
     'allow_ocr' => true,
-    'content_strategy' => 'tika_only',
+    'content_strategy' => 'only_tika',
     'content_composition' => 'text_and_metadata',
     'metadata_strategy' => 'prefer_other',
     'inherits' => 'defaults',
