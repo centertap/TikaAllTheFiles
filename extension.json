@@ -52,6 +52,10 @@
       "TikaAllTheFiles_PropertyMap": {
         "value": [],
         "description": "Additional or override mappings for Tika metadata properties"
+      },
+      "TikaAllTheFiles_ThrowExceptionOnTikaFailure": {
+        "value": true,
+        "description": "If connection with tike server failed - to throw error (false) or just log it"
       }
     },
     "MessagesDirs": {

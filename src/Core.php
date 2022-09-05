@@ -705,7 +705,13 @@ class Core {
       } // while ( $triesRemaining > 0 )
 
       // Retries exhausted.  Oh, well, at least we (re)tried.
-      throw new MWException( "Tika query exhausted retries for {$filePath}" );
+      if( $this->config->get( 'ThrowExceptionOnTikaFailure' ) ) {
+        throw new MWException( "Failed to communicate with Tika server" );
+      }
+      else{
+        $this->logger->warning( "Failed to communicate with Tika server" );
+        return [];
+      }
     }
     finally {
       fclose( $inputFile );
