@@ -175,7 +175,10 @@ class TatfMediaHandlerFactory extends MediaHandlerFactory {
         return new WrappingMediaHandler_1_35( $this->core, $typeProfile,
                                               $theirHandler );
       case '1.37':
-      case '1.38': // TODO(maddog) ...so far!  Confirm when 1.38 is released.
+      case '1.38':
+      case '1.39':
+      case '1.40':
+      case '1.41':
         return new WrappingMediaHandler_1_37( $this->core, $typeProfile,
                                               $theirHandler );
       default:

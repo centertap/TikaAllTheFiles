@@ -35,21 +35,21 @@ class WrappingMediaHandlerBase extends MediaHandler {
    *
    * @var Core
    */
-  private Core $core;
+  protected Core $core;
 
   /**
    * The TypeProfile which defines the operation of this handler
    *
    * @var TypeProfile
    */
-  private TypeProfile $typeProfile;
+  protected TypeProfile $typeProfile;
 
   /**
    * The MediaHander which we are wrapping/shimming.
    *
    * @var MediaHandler
    */
-  private MediaHandler $wrapped;
+  protected MediaHandler $wrapped;
 
 
   /**
@@ -184,7 +184,7 @@ class WrappingMediaHandlerBase extends MediaHandler {
    * @param mixed $args,... - arguments to forward
    * @return mixed
    */
-  private function relegateTo( $f, ...$args ) {
+  protected function relegateTo( $f, ...$args ) {
     return $this->wrapped->$f( ...$args );
   }
 

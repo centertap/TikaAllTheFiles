@@ -480,6 +480,14 @@ class Core {
     $formatted = [ 'visible' => [],
                    'collapsed' => [], ];
 
+    // Construct a FormatMetadata object, along the lines of what the
+    // deprecated FormatMetadata::flattenArrayContentLang() does,
+    // or ExifBitmapHandler::convertMetadataVersion().
+    $formatter = new FormatMetadata;
+    if ( $context ) {
+      $formatter->setContext( $context );
+    }
+
     foreach ( $tikaMetadata as $tikaName => $tikaValue ) {
       $mapped = $this->metadataMapper->map( $tikaName, $tikaValue, $context );
       if ( $mapped === null ) {
@@ -490,9 +498,9 @@ class Core {
       $formatted[ $visibility ][] = [
           'id' => $mapped->id(),
           'name' => $mapped->name(),
-          'value' => FormatMetadata::flattenArrayReal( $mapped->values(),
-                                                       /*type=*/'ul',
-                                                       /*noHtml=*/false ),
+          'value' => $formatter->flattenArrayReal( $mapped->values(),
+                                                   /*type=*/'ul',
+                                                   /*noHtml=*/false ),
                                   ];
     }
     // Alphabetic sort Tika metadata by property name
