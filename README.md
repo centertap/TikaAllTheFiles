@@ -56,7 +56,7 @@ To make use of **TikaAllTheFiles** (TATF), you will need:
  * PHP >= 7.4.0
 
  * Mediawiki >= 1.35
-   * *TATF has been developed/tested with MW 1.35.
+   * *TATF is now developed/tested with MW 1.39.
      See [Known Bugs](#known-bugs) for possible issues with newer versions.*
 
  * [CirrusSearch](https://www.mediawiki.org/wiki/Extension:CirrusSearch)
@@ -592,8 +592,8 @@ See [`RELEASE-NOTES.md`](RELEASE-NOTES.md).
 
 ## Known Bugs
 
- * TATF *should* work with MediaWiki 1.36 and 1.37, however it has not yet
-   been tested with any version >1.35.  If there are any version-related
+ * TATF is expected to work with MediaWiki 1.40 and 1.41, however it has not
+   yet been tested with any version >1.39.  If there are any version-related
    issues, we would only expect them to affect MIME types configured to use
    the `wrapping` handler-strategy.
 
