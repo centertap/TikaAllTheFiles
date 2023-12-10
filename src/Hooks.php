@@ -62,6 +62,7 @@ class Hooks implements MediaWikiServicesHook {
 
     $services->addServiceManipulator(
         'MediaHandlerFactory',
+        /** @unused-param $container */
         function ( MediaHandlerFactory $oldFactory,
                    MediaWikiServices $container ) {
           # TODO(maddog) Due to some bug(*), in at least MW 1.35.3, this service

@@ -26,6 +26,7 @@ namespace MediaWiki\Extension\TikaAllTheFiles;
 
 use Config;
 use FormatMetadata;
+use IContextSource;
 use Psr\Log\LoggerInterface;
 
 
@@ -86,6 +87,7 @@ class MetadataMapper {
     } else {
       $processor = array_shift( $args );
     }
+    Core::insist( is_callable( $processor ) );
 
     $this->logger->debug(
         'map:  prop- {tika_name}  processor- {processor}  args- {args}  val- {tika_value}',
@@ -112,7 +114,7 @@ class MetadataMapper {
    * Try to process a Tika metadata property using the existing Mediawiki core
    * metadata machinery.
    *
-   * @param string $tikaName
+   * @param string $tikaName @unused-param
    * @param string|array $tikaValues
    * @param false|IContextSource $context - optional context for string rendering
    * @param string $displayedTag name to be displayed for the property
@@ -133,7 +135,7 @@ class MetadataMapper {
     foreach ( $tikaValues as $value ) {
       $tags = [ $formatAsTag => $value ];
       $tags = FormatMetadata::getFormattedData( $tags, $context );
-      $formattedValue[] = $tags[ $formatAsTag ];
+      $formattedValues[] = $tags[ $formatAsTag ];
     }
 
     $loweredCaseTag = strtolower( $displayedTag );
@@ -159,7 +161,7 @@ class MetadataMapper {
    *
    * @param string $tikaName
    * @param string|array $tikaValues
-   * @param false|IContextSource $context - optional context for string rendering
+   * @param false|IContextSource $context @unused-param
    *
    * @return ProcessedProperty
    */

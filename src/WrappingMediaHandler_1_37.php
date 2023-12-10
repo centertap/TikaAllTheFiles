@@ -72,7 +72,12 @@ class WrappingMediaHandler_1_37 extends WrappingMediaHandlerBase {
 
 
   // New in 1.37.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @unused-param $state
+   * (NB: $state *does* get passed along to wrapped handler, but we do not
+   *      use it after that.)
+   */
   public function getSizeAndMetadata( $state, $path ) {
     $sizeAndMetadata = $this->relegateTo( __FUNCTION__, ...func_get_args() );
     // Documentation for this method says:
@@ -120,7 +125,10 @@ class WrappingMediaHandler_1_37 extends WrappingMediaHandlerBase {
   // public function isMetadataValid( $image, $metadata )
 
   // New in 1.37.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isFileMetadataValid( $image ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
@@ -173,7 +181,9 @@ class WrappingMediaHandler_1_37 extends WrappingMediaHandlerBase {
   // public function getContentHeaders( $metadata )
 
   // New in 1.37.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   */
   public function useSplitMetadata() {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }

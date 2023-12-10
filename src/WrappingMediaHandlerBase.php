@@ -78,7 +78,7 @@ class WrappingMediaHandlerBase extends MediaHandler {
    * and if something like ProofreadPages wants the original page-by-page
    * text, they might even get it.)
    *
-   * {@inheritDoc}
+   * @override
    */
   public function getEntireText( File $file ) {
     $this->core->getLogger()->debug( 'getEntireText() for "{title}"',
@@ -102,7 +102,10 @@ class WrappingMediaHandlerBase extends MediaHandler {
    * attached to the file.  However, we *may* try to sneak our own metadata
    * blob into the wrapped handler's metadata.
    *
-   * {@inheritDoc}
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   * (NB: $image gets passed along to wrapped handler, but we do not use it
+   *      ourselves after that.)
    */
   public function getMetadata( $image, $path ) {
     $otherSerialized = $this->relegateTo( __FUNCTION__, ...func_get_args() );
@@ -143,7 +146,7 @@ class WrappingMediaHandlerBase extends MediaHandler {
    * Though not clearly documented in the API, this needs to return false
    * when there is no metadata to display.
    *
-   * {@inheritDoc}
+   * @override
    */
   public function formatMetadata( $file, $context = false ) {
     $otherFormattedMetadata =
@@ -181,7 +184,7 @@ class WrappingMediaHandlerBase extends MediaHandler {
    * Helper function for invoking wrapped methods.
    *
    * @param string $f - function to relegate to
-   * @param mixed $args,... - arguments to forward
+   * @param mixed ...$args - arguments to forward
    * @return mixed
    */
   protected function relegateTo( $f, ...$args ) {
@@ -189,62 +192,95 @@ class WrappingMediaHandlerBase extends MediaHandler {
   }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getParamMap() {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function validateParam( $name, $value ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function makeParamString( $params ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function parseParamString( $str ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function normaliseParams( $image, &$params ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getImageSize( $image, $path ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function convertMetadataVersion( $metadata, $version = 1 ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getMetadataType( $image ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isMetadataValid( $image, $metadata ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getCommonMetaArray( File $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getScriptedTransform( $image, $script, $params ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
@@ -254,62 +290,98 @@ class WrappingMediaHandlerBase extends MediaHandler {
   // }
 
   // abstract
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function doTransform( $image, $dstPath, $dstUrl, $params, $flags = 0 ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getThumbType( $ext, $mime, $params = null ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function canRender( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function mustRender( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isMultiPage( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function pageCount( File $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isVectorized( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isAnimatedImage( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function canAnimateThumbnail( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isEnabled() {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getPageDimensions( File $image, $page ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getPageText( File $image, $page ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
@@ -318,93 +390,147 @@ class WrappingMediaHandlerBase extends MediaHandler {
   //   Psych!  We actually implemented this ourselves, up at the top.
   // }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getShortDesc( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getLongDesc( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getDimensionsString( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function parserTransformHook( $parser, $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function verifyUpload( $fileName ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function removeBadFile( $dstPath, $retval = 0 ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function filterThumbnailPurgeList( &$files, $options ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function canRotate() {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getRotation( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getAvailableLanguages( File $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getMatchedLanguage( $userPreferredLanguage,
                                       array $availableLanguages ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getDefaultRenderLanguage( File $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getLength( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function isExpensiveToThumbnail( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function supportsBucketing() {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function sanitizeParamsForBucketing( $params ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getWarningConfig( $file ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }
 
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @suppress PhanUnusedPublicMethodParameter
+   */
   public function getContentHeaders( $metadata ) {
     return $this->relegateTo( __FUNCTION__, ...func_get_args() );
   }

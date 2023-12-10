@@ -110,22 +110,24 @@ class TatfMediaHandlerFactory extends MediaHandlerFactory {
           break;
         case 'fallback':
           // We will handle this type ourselves if not already handled.
+          Core::insist( $typeProfile !== null );
           $ourHandler =
               $theirHandler ?: new SoloMediaHandler( $this->core, $typeProfile );
           break;
         case 'override':
           // We will always handle this type ourselves.
+          Core::insist( $typeProfile !== null );
           $ourHandler = new SoloMediaHandler( $this->core, $typeProfile );
           break;
         case 'wrapping':
           // We will wrap the existing handler, or handle it ourselves if we
           // have to.
+          Core::insist( $typeProfile !== null );
           $ourHandler = $this->maybeWrapHandler( $theirHandler ?: null,
                                                  $typeProfile, $type );
           break;
         default:
           Core::unreachable();
-          break;
       }
       $this->core->getLogger()->debug(
           'Execute {strategy} strategy for type {type}: ' .
@@ -134,6 +136,7 @@ class TatfMediaHandlerFactory extends MediaHandlerFactory {
             'type' => $type,
             'theirs' => $theirHandler,
             'ours' => $ourHandler ] );
+      Core::insist( $ourHandler !== null );
       $this->ourHandlers[$type] = $ourHandler;
     }
     return $ourHandler;

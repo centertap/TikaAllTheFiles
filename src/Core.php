@@ -28,6 +28,7 @@ use Config;
 use File;
 use FormatMetadata;
 use GlobalVarConfig;
+use IContextSource;
 use MediaWiki\Logger\LoggerFactory;
 use MWException;
 use Psr\Log\LoggerInterface;
@@ -114,6 +115,7 @@ class Core {
    * if $condition is false.
    *
    * @param bool $condition the asserted condition
+   * @phan-assert-true-condition $condition
    * @param string $msg description of the condition
    *
    * @return void This function returns no value.
@@ -132,6 +134,7 @@ class Core {
    * Log an error and backtrace indicating that purportedly unreachable code
    * has in fact been reached.
    *
+   * @return never
    * @throws MWException always.
    */
   public static function unreachable()/*: never*/ {
@@ -203,6 +206,7 @@ class Core {
     }
 
     $filePath = $file->getLocalRefPath();
+    '@phan-var string|false $filePath'; // NB: getLocalRefPath() is mistyped.
     self::insist( $filePath !== false,
                   "Local path for file {$file->getName()} is known" );
 
@@ -236,7 +240,6 @@ class Core {
         break;
       default:
         self::unreachable();
-        break;
     }
 
     $newContent = self::mergeContent( $typeProfile->contentStrategy,
@@ -431,7 +434,7 @@ class Core {
     // In case we have stashed TATF metadata in other, remove it from the
     // formatted results so that it is not shown to user.
     if ( $otherFormattedMetadata !== null ) {
-      foreach ( $otherFormattedMetadata as $visibility => &$group ) {
+      foreach ( $otherFormattedMetadata as $unused_visibility => &$group ) {
         foreach ( $group as $index => $tuple ) {
           if ( $tuple['name'] === self::STASH_TAG ) {
             unset( $group[$index] );
@@ -489,15 +492,20 @@ class Core {
     }
 
     foreach ( $tikaMetadata as $tikaName => $tikaValue ) {
+      self::insist( is_string($tikaName) );
       $mapped = $this->metadataMapper->map( $tikaName, $tikaValue, $context );
       if ( $mapped === null ) {
         continue;
       }
-      $visibility = in_array( $mapped->visibilityTag(), $visibleFields )
+      $visibility = in_array( $mapped->visibilityTag(), $visibleFields,
+                              /*strict=*/true )
           ? 'visible' : 'collapsed';
       $formatted[ $visibility ][] = [
           'id' => $mapped->id(),
           'name' => $mapped->name(),
+          // Yes, it's marked internal, but it also has a comment "This is
+          // public because it could be useful elsewhere...".
+          // @phan-suppress-next-line PhanAccessMethodInternal
           'value' => $formatter->flattenArrayReal( $mapped->values(),
                                                    /*type=*/'ul',
                                                    /*noHtml=*/false ),
@@ -539,7 +547,7 @@ class Core {
     $otherEntries = [];
     if ( ( $otherFormattedMetadata !== null ) &&
          ( $strategy !== 'only_tika' ) ) {
-      foreach ( $otherFormattedMetadata as $visibility => $group ) {
+      foreach ( $otherFormattedMetadata as $unused_visibility => $group ) {
         foreach ( $group as $tuple ) {
           // In case we have stashed TATF metadata in other, remove it from
           // other's formatted output.
@@ -554,6 +562,7 @@ class Core {
     $tikaEntries = [];
     if ( ( $tikaMetadata !== null ) && ( $strategy !== 'no_tika' ) ) {
       foreach ( $tikaMetadata as $tikaName => $tikaValue ) {
+        self::insist( is_string($tikaName) );
         $mapped =
             $this->metadataMapper->map( $tikaName, $tikaValue, $context );
         if ( $mapped === null ) {
@@ -582,7 +591,12 @@ class Core {
         break;
       default:
         self::unreachable();
-        break;
+        // TODO(maddog) Remove following when phan false positives go away.
+        // @phan-suppress-next-line PhanPluginUnreachableCode
+        $combinedEntries = []; // @phan-suppress-current-line PhanUnusedVariable
+    }
+    if ( count( $combinedEntries ) === 0 ) {
+      return null;
     }
     return implode( '', $combinedEntries );
   }
@@ -611,13 +625,11 @@ class Core {
     $triesRemaining = 1 + $this->config->get( 'QueryRetryCount' );
     $retryDelaySeconds = $this->config->get( 'QueryRetryDelaySeconds' );
 
+    $inputFile = fopen( $filePath, 'r' );
+    if ( $inputFile === false ) {
+      throw new MWException( "Failed to open '{$filePath}' for read" );
+    }
     try {
-      $inputFile = fopen( $filePath, 'r' );
-      $this->logger->debug( "inputFile is '{$inputFile}'" );
-      if ( $inputFile === false ) {
-        throw new MWException( "Failed to open '{$filePath}' for read" );
-      }
-
       $inputSize = filesize( $filePath );
       if ( $inputSize === false ) {
         throw new MWException( "Failed to get size of '{$filePath}'" );
@@ -688,7 +700,10 @@ class Core {
           switch ( $httpStatus ) {
             case 200:
               // "Ok - request completed sucessfully"
-              return json_decode( $response, true /*as array*/ );
+              $decoded = json_decode( $response, true /*as array*/ );
+              // Result *should* be an array (not a single atomic value).
+              self::insist( is_array( $decoded ) );
+              return $decoded;
             case 204: // "No content - request completed sucessfully, result is empty"
             case 422: // "Unprocessable Entity - Unsupported mime-type, encrypted document & etc"
               // TODO(maddog) Log a warning for the 422 case (and maybe 204)
@@ -702,7 +717,7 @@ class Core {
               // In all these cases, just continue to (maybe) retry.
               break;
           }
-          $this->logger->warning( "Tika responded with status {$status}" );
+          $this->logger->warning( "Tika responded with status {$httpStatus}" );
         }
         --$triesRemaining;
         if ( $triesRemaining > 0 ) {
@@ -724,7 +739,7 @@ class Core {
   /**
    * Execute an HTTP request using PHP's curl library.
    *
-   * @param array $options array of CURLOPT_ parameters for the request
+   * @param array<int,mixed> $options CURLOPT_ parameters for the request
    *
    * @return array of [response, status].  response will be false if the
    *  request fails due to a curl error; otherwise it will be a string with
@@ -733,9 +748,11 @@ class Core {
    * @throws MWException for errors in preparing the curl request
    */
   private function executeCurl( array $options ) {
+    $curl = curl_init();
+    if ( !$curl ) {
+      throw new MWException( "curl_init() failed." );
+    }
     try {
-      $curl = curl_init();
-
       foreach ( $options as $option => $value ) {
         if ( !curl_setopt( $curl, $option, $value ) ) {
           throw new MWException(
@@ -809,20 +826,25 @@ class Core {
       case 'no_tika':
         return $other;
       case 'prefer_other':
-        return ( $other !== null ) ? $other : $tika;
+        return $other ?? $tika;
       case 'combine':
         if ( ( $other ?? '' ) === '' ) {
           return $tika;
         } elseif ( $tika === '' ) {
           return $other;
         } /* else */
+        self::insist( $other !== null ); // phan can't figure this out itself.
         return implode( "\n", [ $other, $tika ] );
       case 'prefer_tika':
         return ( $tika !== '' ) ? $tika : $other;
       case 'only_tika':
         return $tika;
+      default:
+        self::unreachable();
     }
-    self::unreachable();
+    // TODO(maddog) Remove following when phan false positives go away.
+    // @phan-suppress-next-line PhanPluginUnreachableCode
+    return null; // Suppress a phan warning; we should never actually get here.
   }
 
 
@@ -841,7 +863,7 @@ class Core {
       case 'no_tika':
         return $other;
       case 'prefer_other':
-        return ( $other !== null ) ? $other : $tika;
+        return $other ?? $tika;
       case 'combine':
         if ( ( $tika === null ) && ( $other === null ) ) {
           return null;
@@ -854,10 +876,14 @@ class Core {
                                         ( $tika ?? [] )['collapsed'] ?? [] ),
                 ];
       case 'prefer_tika':
-        return ( $tika !== null ) ? $tika : $other;
+        return $tika ?? $other;
       case 'only_tika':
         return $tika;
+      default:
+        self::unreachable();
     }
-    self::unreachable();
+    // TODO(maddog) Remove following when phan false positives go away.
+    // @phan-suppress-next-line PhanPluginUnreachableCode
+    return null; // Suppress a phan warning; we should never actually get here.
   }
 }

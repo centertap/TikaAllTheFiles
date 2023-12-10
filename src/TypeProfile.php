@@ -126,7 +126,7 @@ class TypeProfile {
         $this->checkEnum( 'contentComposition', self::CONTENT_COMPOSITIONS ),
         $this->checkEnum( 'metadataStrategy', self::METADATA_STRATEGIES ),
                ];
-    return !in_array( false, $checks );
+    return !in_array( false, $checks, /*strict=*/true );
   }
 
 
@@ -151,7 +151,6 @@ class TypeProfile {
           'contentComposition' => 'content_composition',
           'metadataStrategy' => 'metadata_strategy',
                    ];
-
     while ( $label !== null ) {
       $block = self::resolveStringLabel( $label, $configMap, $visitedLabels );
       unset( $label );
@@ -166,7 +165,10 @@ class TypeProfile {
         }
       }
 
-      if ( !$unresolved ) {
+      // Suppress false positive (phan does not realize that the size of
+      // can change $unresolved.)
+      // @phan-suppress-next-line PhanSuspiciousValueComparisonInLoop
+      if ( count( $unresolved ) === 0 ) {
         if ( $this->checkValidity() ) {
           return $this;
         }
@@ -195,7 +197,7 @@ class TypeProfile {
    * @param array &$visitedLabels - list of labels which have been visited;
    *  passed by reference and modified (with addition of newly visited labels)
    *
-   * @return array - returns a configuration block (array) if $label can be
+   * @return ?array - returns a configuration block (array) if $label can be
    *  resolved, otherwise returns null.
    */
   private static function resolveStringLabel(

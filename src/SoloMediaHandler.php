@@ -26,6 +26,7 @@ namespace MediaWiki\Extension\TikaAllTheFiles;
 
 use File;
 use MediaHandler;
+use TransformParameterError;
 
 
 class SoloMediaHandler extends MediaHandler {
@@ -64,7 +65,7 @@ class SoloMediaHandler extends MediaHandler {
    * MediaHandler::getEntireText()).  But, given the other screwball stuff
    * we are willing to do, might as well eliminate the middle-man.
    *
-   * {@inheritDoc}
+   * @override
    */
   public function getEntireText( File $file ) {
     $this->core->getLogger()->debug( 'getEntireText() for "{title}"',
@@ -92,7 +93,8 @@ class SoloMediaHandler extends MediaHandler {
    * It looks like this is deprecated in 1.37 as part of an effort to tidy up
    * these interfaces.
    *
-   * {@inheritDoc}
+   * @override
+   * @unused-param $image
    */
   public function getMetadata( $image, $path ) {
     $this->core->getLogger()->debug( 'getMetadata() for "{path}"',
@@ -113,7 +115,7 @@ class SoloMediaHandler extends MediaHandler {
    * Though not clearly documented in the API, this needs to return false
    * when there is no metadata to display.
    *
-   * {@inheritDoc}
+   * @override
    */
   public function formatMetadata( $file, $context = false ) {
     $serializedMetadata = $file->getMetadata();
@@ -140,7 +142,10 @@ class SoloMediaHandler extends MediaHandler {
   // ***************************************************************************
 
   // Sorry, we don't know how to render/transform/thumbnail any files.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @unused-param $file
+   */
   public function canRender( $file ) {
     return false;
   }
@@ -196,45 +201,72 @@ class SoloMediaHandler extends MediaHandler {
   // **************************************************************************
 
   // Used for embedding images in wikitext, which we don't support.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   */
   public function getParamMap(): array {
     return [];
   }
 
   // Used for generating thumbnails, which we don't support.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @unused-param $name
+   * @unused-param $value
+   */
   public function validateParam( $name, $value ): bool {
     return false;
   }
 
   // Used for generating thumbnail filenames, but we don't support thumbnails.
-  /** {@inheritDoc} */
-  public function makeParamString( $params ): string {
+  /**
+   * @override
+   * @unused-param $params
+   */
+  public function makeParamString( $params ) {
     return "";
   }
 
   // Does the inverse of makeParamString().
-  /** {@inheritDoc} */
-  public function parseParamString( $str ): array {
+  /**
+   * @override
+   * @unused-param $str
+   */
+  public function parseParamString( $str ) {
     return false;
   }
 
   // Prepares thumbnail parameters for makeParamString().
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @unused-param $image
+   * @unused-param $params
+   */
   public function normaliseParams( $image, &$params ) {
     return false;
   }
 
   // Extract the size of an image.
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @unused-param $image
+   * @unused-param $path
+   */
   public function getImageSize( $image, $path ) {
     return false;
   }
 
   // Transform an image (e.g., to make thumbnails).
-  /** {@inheritDoc} */
+  /**
+   * @override
+   * @unused-param $file
+   * @unused-param $dstPath
+   * @unused-param $dstUrl
+   * @unused-param $params
+   * @unused-param $flags
+   */
   public function doTransform( $file, $dstPath, $dstUrl, $params, $flags = 0 ) {
-    return false;
+    return new TransformParameterError( $params );
   }
 
 }
