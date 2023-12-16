@@ -27,7 +27,7 @@ namespace MediaWiki\Extension\TikaAllTheFiles;
 use MediaHandlerFactory;
 use MediaWiki\Hook\MediaWikiServicesHook;
 use MediaWiki\MediaWikiServices;
-// use MWException;
+
 
 class Hooks implements MediaWikiServicesHook {
 
@@ -54,43 +54,14 @@ class Hooks implements MediaWikiServicesHook {
    * @return void
    */
   public function onMediaWikiServices( $services ) {
-    // TODO(maddog) Spammy logging to help diagnose the doubled manipulator
-    //              bug, as described further below.
-    // $this->core->getLogger()->debug(
-    //     'onMediaWikiServices hook executes {exception}',
-    //     [ 'exception' => new MWException() ] );
-
     $services->addServiceManipulator(
         'MediaHandlerFactory',
         /** @unused-param $container */
         function ( MediaHandlerFactory $oldFactory,
                    MediaWikiServices $container ) {
-          # TODO(maddog) Due to some bug(*), in at least MW 1.35.3, this service
-          #              manipulator gets added twice.  So, we try to catch any
-          #              double-execution and prevent wrapping-the-wrapper.
-          #
-          #    (*)
-          #     Setup.php
-          #       ExtensionRegistry::getInstance()->loadFromQueue();
-          #         (SemanticMediaWiki)
-          #           MediaWikiServices::getInstance();
-          #             --> run onMediaWikiServices hook
-          #                   (hooks call addServiceManipulator() )
-          #        ...
-          #        MediaWikiServices::resetGlobalInstance( new GlobalVarConfig(), 'quick' );
-          #          -> creates a new MediaWikiServices instance
-          #          -> run onMediaWikiServices hook
-          #                   (hooks call addServiceManipulator() )
-          #          -> self::$instance->importWiring( $oldInstance, [ 'BootstrapConfig' ] );
-          #             - causes service manipulators from the original instance
-          #               to be added to the new instance
-          #                 - TA-DA!  All SM's are now duplicated.
-          if ( $oldFactory instanceof TatfMediaHandlerFactory ) {
-            $this->core->getLogger()->warning(
-                'Here we go again!  Our Service Manipulator appears to have ' .
-                'been added twice.  We will skip wrapping ourselves.' );
-            return null;
-          }
+          // NB: MW-1.35 had a bug that caused double-wrapping.  This was fixed
+          // in MW-1.36... but let's explode if it ever happens again.
+          Core::insist( !($oldFactory instanceof TatfMediaHandlerFactory) );
           return new TatfMediaHandlerFactory( $oldFactory );
         } );
   }

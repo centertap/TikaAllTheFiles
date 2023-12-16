@@ -155,16 +155,15 @@ class WrappingMediaHandlerBase extends MediaHandler {
       return $otherFormattedMetadata;
     }
 
-    $tikaMetadata = null;
-    $serializedMetadata = $file->getMetadata();
-    if ( $serializedMetadata ) {
-      $metadata = unserialize( $serializedMetadata );
-      $tikaMetadata = Core::unstashTatfMetadata( $metadata ?: [] );
-      if ( $tikaMetadata === null ) {
-        $this->core->getLogger()->debug( 'No stashed TATF metadata???' );
-        $this->core->getLogger()->debug( var_export( $metadata, true ) );
-      }
-    }
+    // TODO(maddog) If TATF was installed after the wiki already has uploads,
+    //              it is certainly possible that there are files that are
+    //              being handled by TATF now that hadn't been when uploaded.
+    //
+    //              Should we have a mechanism to automagically do something?
+    //              Or, is it better to just instruct admins to globally refresh
+    //              metadata after TATF is installed?  (And, perhaps add some
+    //              feature to limit refresh to TATF-handled media?)
+    $tikaMetadata = Core::unstashTatfMetadata( $file->getMetadataArray() );
 
     return $this->core->formatMetadataForMwUi( $this->typeProfile,
                                                $tikaMetadata,

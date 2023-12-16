@@ -106,6 +106,9 @@ class Core {
       //              even deeper subarray or something?)
       return $stash[ 'metadata' ] ?? null;
     }
+
+    self::newLogger()->debug( 'No stashed TATF metadata???' );
+    self::newLogger()->debug( var_export( $other, true ) );
     return null;
   }
 

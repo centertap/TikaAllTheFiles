@@ -118,18 +118,7 @@ class SoloMediaHandler extends MediaHandler {
    * @override
    */
   public function formatMetadata( $file, $context = false ) {
-    $serializedMetadata = $file->getMetadata();
-    if ( !$serializedMetadata ) {
-      return false;
-    }
-    $metadata = unserialize( $serializedMetadata );
-    $tikaMetadata = Core::unstashTatfMetadata( $metadata );
-    if ( $tikaMetadata === null ) {
-      $this->core->getLogger()->debug( 'No stashed TATF metadata???' );
-      $this->core->getLogger()->debug( var_export( $metadata, true ) );
-      return false;
-    }
-
+    $tikaMetadata = Core::unstashTatfMetadata( $file->getMetadataArray() );
     return $this->core->formatMetadataForMwUi( $this->typeProfile,
                                                $tikaMetadata,
                                                /*otherFormattedMetadata=*/null,
