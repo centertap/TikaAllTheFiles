@@ -26,6 +26,7 @@ namespace MediaWiki\Extension\TikaAllTheFiles;
 
 use MediaHandler;
 use MediaHandlerFactory;
+use MediaWiki\Extension\TikaAllTheFiles\Enums\HandlerStrategy;
 
 
 class TatfMediaHandlerFactory extends MediaHandlerFactory {
@@ -85,54 +86,49 @@ class TatfMediaHandlerFactory extends MediaHandlerFactory {
       //  (b) the registered handler returns false from isEnabled().
 
       $typeProfile = $this->core->getMimeTypeProfile( $type );
-      // TODO(maddog) In PHP8, this can become
-      //              $strategy = $typeProfile?->handlerStrategy;
-      $strategy =
-          ( $typeProfile === null ) ? null : $typeProfile->handlerStrategy;
+      // TODO(maddog) Remove suppress when phan understands nullsafe operator.
+      //              https://github.com/phan/phan/issues/4067
+      // @phan-suppress-next-line PhanPossiblyUndeclaredProperty
+      $strategy = $typeProfile?->handlerStrategy;
 
-      // | strategy  | theirs    || ours
-      // |-----------|-----------||--------------------------------
-      // |     null  | false     || false
-      // |           | Something || Something
-      // |-----------|-----------||--------------------------------
-      // |'fallback' | false     || SoloMediaHandler
-      // |           | Something || Something
-      // |-----------|-----------||--------------------------------
-      // |'override' | false     || SoloMediaHandler
-      // |           | Something || SoloMediaHandler
-      // |-----------|-----------||--------------------------------
-      // |'wrapping' | false     || SoloMediaHandler
-      // |           | Something || WrappingMediaHandler(Something)
-      switch ( $strategy ) {
-        case null:
-          // We won't try to handle this type at all.
-          $ourHandler = $theirHandler;
-          break;
-        case 'fallback':
-          // We will handle this type ourselves if not already handled.
-          Core::insist( $typeProfile !== null );
-          $ourHandler =
-              $theirHandler ?: new SoloMediaHandler( $this->core, $typeProfile );
-          break;
-        case 'override':
-          // We will always handle this type ourselves.
-          Core::insist( $typeProfile !== null );
-          $ourHandler = new SoloMediaHandler( $this->core, $typeProfile );
-          break;
-        case 'wrapping':
-          // We will wrap the existing handler, or handle it ourselves if we
-          // have to.
-          Core::insist( $typeProfile !== null );
-          $ourHandler = $this->maybeWrapHandler( $theirHandler ?: null,
-                                                 $typeProfile, $type );
-          break;
-        default:
-          Core::unreachable();
-      }
+      // | strategy | theirs    || ours
+      // |----------|-----------||--------------------------------
+      // |     null | false     || false
+      // |          | Something || Something
+      // |----------|-----------||--------------------------------
+      // | Fallback | false     || SoloMediaHandler
+      // |          | Something || Something
+      // |----------|-----------||--------------------------------
+      // | Override | false     || SoloMediaHandler
+      // |          | Something || SoloMediaHandler
+      // |----------|-----------||--------------------------------
+      // | Wrapping | false     || SoloMediaHandler
+      // |          | Something || WrappingMediaHandler(Something)
+      $ourHandler = match ( $strategy ) {
+        // We won't try to handle this type at all.
+        null => $theirHandler,
+
+        // We will handle this type ourselves if not already handled.
+        HandlerStrategy::Fallback =>
+        $theirHandler ?: new SoloMediaHandler(
+            $this->core, Core::insistNonNull($typeProfile) ),
+
+        // We will always handle this type ourselves.
+        HandlerStrategy::Override => new SoloMediaHandler(
+            $this->core, Core::insistNonNull($typeProfile) ),
+
+        // We will wrap the existing handler, or handle it ourselves if we
+        // have to.
+        HandlerStrategy::Wrapping => $this->maybeWrapHandler(
+            $theirHandler ?: null, Core::insistNonNull($typeProfile), $type ),
+      };
       $this->core->getLogger()->debug(
-          'Execute {strategy} strategy for type {type}: ' .
+          'Execute "{strategy}" strategy for type "{type}": ' .
           'handler {theirs} becomes {ours}.',
-          [ 'strategy' => $strategy,
+          // TODO(maddog) Remove when phan understands nullsafe operator.
+          //              https://github.com/phan/phan/issues/4067
+          // @phan-suppress-next-line PhanPossiblyUndeclaredProperty
+          [ 'strategy' => $strategy?->value,
             'type' => $type,
             'theirs' => $theirHandler,
             'ours' => $ourHandler ] );

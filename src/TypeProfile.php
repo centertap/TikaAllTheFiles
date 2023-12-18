@@ -2,7 +2,7 @@
 /**
  * This file is part of TikaAllTheFiles.
  *
- * Copyright 2021 Matt Marjanovic
+ * Copyright 2023 Matt Marjanovic
  *
  * TikaAllTheFiles is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -24,10 +24,16 @@ declare( strict_types = 1 );
 
 namespace MediaWiki\Extension\TikaAllTheFiles;
 
+use MediaWiki\Extension\TikaAllTheFiles\Enums\{ ContentComposition,
+                                                ContentStrategy,
+                                                HandlerStrategy,
+                                                MetadataStrategy,
+                                                };
+
 class TypeProfile {
 
-  /** @var string Strategy for handler creation */
-  public string $handlerStrategy;
+  /** @var HandlerStrategy Strategy for handler creation */
+  public HandlerStrategy $handlerStrategy;
 
   /** @var bool Should OCR be enabled for this file type? */
   public bool $allowOcr;
@@ -35,16 +41,19 @@ class TypeProfile {
   /** @var string Specifies which languages shall be used for OCR */
   public string $ocrLanguages;
 
-  /** @var string Strategy for creating text-search content */
-  public string $contentStrategy;
+  /** @var ContentStrategy Strategy for creating text-search content */
+  public ContentStrategy $contentStrategy;
 
-  /** @var string What to include in text-search content */
-  public string $contentComposition;
+  /** @var ContentComposition What to include in text-search content */
+  public ContentComposition $contentComposition;
 
-  /** @var string */
-  public string $metadataStrategy;
+  /** @var MetadataStrategy Strategy for choosing metadata sources */
+  public MetadataStrategy $metadataStrategy;
 
 
+  // TODO(maddog) Does it really make sense to ever return null, or is it
+  //              better to just explode if no valid/complete profile can
+  //              be created from the configuration?
   /**
    * Creates a new TypeProfile if a valid one can be configured from $label.
    *
@@ -57,76 +66,6 @@ class TypeProfile {
                                         array $configMap ): ?TypeProfile {
     $tc = new TypeProfile();
     return $tc->resolveFromConfig( $label, $configMap );
-  }
-
-
-  // TODO(maddog) When PHP>=8 is available, use enum.
-  public const HANDLER_STRATEGIES = [
-      'fallback', // TATF-only handler only if no other handler
-      'override', // TATF-only handler always
-      'wrapping', // if other handler, wrap with TATF; otherwise use TATF-only
-                                     ];
-
-  // TODO(maddog) When PHP>=8 is available, use enum.
-  // TODO(maddog) What if someone wants "add-metadata-to-content" but doesn't
-  //              want any text extraction?  Well... if that someone appears,
-  //              we will deal with it then.
-  public const CONTENT_STRATEGIES = [
-      'combine', // append any tika-content to any original text
-      'only_tika', // tika-content, if any, or nothing
-      'prefer_tika', // tika-content only, if any, otherwise original text
-      'prefer_other', // original text only, if any, otherwise tika-content
-      'no_tika', // original text only; skip tika text extraction
-                                     ];
-  // TODO(maddog) When PHP>=8 is available, use enum.
-  public const CONTENT_COMPOSITIONS = [
-      'text',
-      'metadata',
-      'text_and_metadata',
-                                       ];
-
-  // TODO(maddog) When PHP>=8 is available, use enum.
-  public const METADATA_STRATEGIES = [
-      'combine', // append any tika-metadata to any original metadata
-      'only_tika', // tika-metadata, if any, or nothing
-      'prefer_tika', // tika-metadata only, if any, otherwise original metadata
-      'prefer_other', // original metadata only, if any, otherwise tika's
-      'no_tika', // original metadata only; skip tika metadata extraction
-                                     ];
-
-  /**
-   * Helper to simulate a real enum type:  verify that the value of an instance
-   * member belongs to a set of valid values.
-   *
-   * @param string $member - the instance member to verify
-   * @param array $list - list of valid values
-   *
-   * @return bool - returns true if the member has a valid value
-   */
-  private function checkEnum( string $member, array $list ): bool {
-    if ( in_array( $this->$member, $list, true/*strict*/ ) ) {
-      return true;
-    }
-    $imploded = implode( ', ', $list );
-    Core::warn(
-        "{$member} value '{$this->$member}' is not one of: {$imploded}." );
-    return false;
-  }
-
-
-  /**
-   * Check that this TypeProfile is valid.
-   *
-   * @return bool - return true if valid, false otherwise.
-   */
-  private function checkValidity(): bool {
-    $checks = [
-        $this->checkEnum( 'handlerStrategy', self::HANDLER_STRATEGIES ),
-        $this->checkEnum( 'contentStrategy', self::CONTENT_STRATEGIES ),
-        $this->checkEnum( 'contentComposition', self::CONTENT_COMPOSITIONS ),
-        $this->checkEnum( 'metadataStrategy', self::METADATA_STRATEGIES ),
-               ];
-    return !in_array( false, $checks, /*strict=*/true );
   }
 
 
@@ -143,13 +82,16 @@ class TypeProfile {
                                       array $configMap ): ?TypeProfile {
     $visitedLabels = []; // array used as hash-set
     $label = $rootLabel;
+    // Map from each member/property name to pair of config parameter name and
+    // function to parse config parameter value.
     $unresolved = [
-          'handlerStrategy' => 'handler_strategy',
-          'allowOcr' => 'allow_ocr',
-          'ocrLanguages' => 'ocr_languages',
-          'contentStrategy' => 'content_strategy',
-          'contentComposition' => 'content_composition',
-          'metadataStrategy' => 'metadata_strategy',
+        'handlerStrategy' => ['handler_strategy', HandlerStrategy::from(...)],
+        'allowOcr' => ['allow_ocr', fn ($x) => $x],
+        'ocrLanguages' => ['ocr_languages', fn ($x) => $x],
+        'contentStrategy' => ['content_strategy', ContentStrategy::from(...)],
+        'contentComposition' => ['content_composition',
+                                 ContentComposition::from(...)],
+        'metadataStrategy' => ['metadata_strategy', MetadataStrategy::from(...)],
                    ];
     while ( $label !== null ) {
       $block = self::resolveStringLabel( $label, $configMap, $visitedLabels );
@@ -159,22 +101,17 @@ class TypeProfile {
         break;
       }
 
-      foreach ( $unresolved as $member => $key ) {
-        if ( self::tryResolve( $member, $key, $block ) ) {
+      foreach ( $unresolved as $member => [$key, $parser] ) {
+        if ( self::tryResolve( $member, $key, $parser, $block ) ) {
           unset( $unresolved[$member] );
         }
       }
 
       // Suppress false positive (phan does not realize that the size of
-      // can change $unresolved.)
+      // $unresolved can change.)
       // @phan-suppress-next-line PhanSuspiciousValueComparisonInLoop
       if ( count( $unresolved ) === 0 ) {
-        if ( $this->checkValidity() ) {
-          return $this;
-        }
-        Core::warn(
-            "Unable to create a valid profile for label '{$rootLabel}'" );
-        return null;
+        return $this;
       }
 
       // Try the next block in the chain, if any.
@@ -182,7 +119,7 @@ class TypeProfile {
       unset( $block );
     }
 
-    $remaining = implode( ', ', $unresolved );
+    $remaining = implode( ', ', array_column( $unresolved, 0 ) );
     Core::warn( "Unable to create a complete profile for label '{$rootLabel}'; unresolved values for: {$remaining}" );
     return null;
   }
@@ -236,13 +173,15 @@ class TypeProfile {
    *  otherwise true.
    */
   private function tryResolve( string $member,
-                               string $key, array $block ): bool {
+                               string $key,
+                               $parser,
+                               array $block ): bool {
     if ( !isset( $this->$member ) ) {
       $value = $block[ $key ] ?? null;
       if ( $value === null ) {
         return false;
       }
-      $this->$member = $value;
+      $this->$member = $parser($value);
     }
     return true;
   }

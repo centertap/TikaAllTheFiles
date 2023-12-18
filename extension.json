@@ -11,7 +11,7 @@
         "extensions": {
         },
         "platform": {
-            "php": ">=7.4.0"
+            "php": ">=8.1.0"
         }
     },
     "ConfigRegistry": {
@@ -60,7 +60,8 @@
         ]
     },
     "AutoloadNamespaces": {
-        "MediaWiki\\Extension\\TikaAllTheFiles\\": "src/"
+        "MediaWiki\\Extension\\TikaAllTheFiles\\": "src/",
+        "MediaWiki\\Extension\\TikaAllTheFiles\\Enums\\": "src/enums/"
     },
     "HookHandlers": {
       "TatfHooks": {

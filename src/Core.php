@@ -33,6 +33,9 @@ use MediaWiki\Logger\LoggerFactory;
 use MWException;
 use Psr\Log\LoggerInterface;
 
+use MediaWiki\Extension\TikaAllTheFiles\Enums\ContentComposition;
+use MediaWiki\Extension\TikaAllTheFiles\Enums\ContentStrategy;
+use MediaWiki\Extension\TikaAllTheFiles\Enums\MetadataStrategy;
 
 /**
  * Common core functionality used by multiple TATF components
@@ -133,6 +136,34 @@ class Core {
     }
   }
 
+
+  /**
+   * Strictly assert that a value is non-null, and return the value.
+   * Logs an error and backtrace if the value is null.
+   *
+   * This is useful when phan's static analysis is not clever enough to
+   * figure out that a passed value will be non-null, but suppressing a
+   * phan-warning feels fragile.
+   *
+   * @template T
+   * @param ?T $value the checked value
+   * @phan-assert !null $value
+   * @param string $msg description of the condition
+   *
+   * @return T the non-null input value.
+   * @throws MWException if $value is null.
+   */
+  public static function insistNonNull( $value, string $msg = '' ) {
+    if ( $value === null ) {
+      // The $callerOffset parameter "2" tells wfLogWarning to identify
+      // the function/line that called us as the location of the error.
+      wfLogWarning( self::LOG_GROUP . ' Unexpected null value: ' . $msg, 2 );
+      throw new MWException( 'Unexpected null value: ' . $msg );
+    }
+    return $value;
+  }
+
+
   /**
    * Log an error and backtrace indicating that purportedly unreachable code
    * has in fact been reached.
@@ -201,8 +232,8 @@ class Core {
       File $file,
       ?string $otherContent,
       ?array $otherFormattedMetadata ): ?string {
-    if ( ( $typeProfile->contentStrategy === 'no_tika' ) ||
-         ( ( $typeProfile->contentStrategy === 'prefer_other' ) &&
+    if ( ( $typeProfile->contentStrategy === ContentStrategy::NoTika ) ||
+         ( ( $typeProfile->contentStrategy === ContentStrategy::PreferOther ) &&
            ( $otherContent !== null ) ) ) {
       // No need to query Tika at all.
       return $otherContent;
@@ -213,8 +244,11 @@ class Core {
     self::insist( $filePath !== false,
                   "Local path for file {$file->getName()} is known" );
 
-    $onlyMetadata = ( $typeProfile->contentComposition === 'metadata' );
-
+    $onlyMetadata = match ( $typeProfile->contentComposition ) {
+      ContentComposition::Text => false,
+      ContentComposition::Metadata => true,
+      ContentComposition::TextAndMetadata => false,
+    };
     $response = $this->queryTika( $typeProfile, $filePath, $onlyMetadata );
 
     $this->logger->debug( 'Tika response:  {response}',
@@ -225,11 +259,11 @@ class Core {
     unset( $response["X-TIKA:content"] );
 
     switch ( $typeProfile->contentComposition ) {
-      case 'text':
+      case ContentComposition::Text:
         // Nothing to do.
         break;
-      case 'metadata':
-      case 'text_and_metadata':
+      case ContentComposition::Metadata:
+      case ContentComposition::TextAndMetadata:
         // Append the same metadata that we would show to user (albeit
         // formatted a little differently).  The point is to allow the user
         // to search for something they saw in the displayed metadata.
@@ -269,8 +303,9 @@ class Core {
                                     string $filePath,
                                     ?array $otherMetadata ): ?array {
     $strategy = $typeProfile->metadataStrategy;
-    if ( ( $strategy === 'no_tika' ) ||
-         ( ( $strategy === 'prefer_other' ) && ( $otherMetadata !== null ) ) ) {
+    if ( ( $strategy === MetadataStrategy::NoTika ) ||
+         ( ( $strategy === MetadataStrategy::PreferOther ) &&
+           ( $otherMetadata !== null ) ) ) {
       // No need to query Tika at all.
       return $otherMetadata;
     }
@@ -448,8 +483,8 @@ class Core {
     }
 
     // Short-circuit if we know $tikaMetadata will not get used.
-    if ( ( $strategy === 'no_tika' ) ||
-         ( ( $strategy === 'prefer_other' ) &&
+    if ( ( $strategy === MetadataStrategy::NoTika ) ||
+         ( ( $strategy === MetadataStrategy::PreferOther ) &&
            ( $otherFormattedMetadata !== null ) ) ) {
       return $otherFormattedMetadata;
     }
@@ -549,7 +584,7 @@ class Core {
 
     $otherEntries = [];
     if ( ( $otherFormattedMetadata !== null ) &&
-         ( $strategy !== 'only_tika' ) ) {
+         ( $strategy !== MetadataStrategy::OnlyTika ) ) {
       foreach ( $otherFormattedMetadata as $unused_visibility => $group ) {
         foreach ( $group as $tuple ) {
           // In case we have stashed TATF metadata in other, remove it from
@@ -563,7 +598,8 @@ class Core {
     }
 
     $tikaEntries = [];
-    if ( ( $tikaMetadata !== null ) && ( $strategy !== 'no_tika' ) ) {
+    if ( ( $tikaMetadata !== null ) &&
+         ( $strategy !== MetadataStrategy::NoTika ) ) {
       foreach ( $tikaMetadata as $tikaName => $tikaValue ) {
         self::insist( is_string($tikaName) );
         $mapped =
@@ -576,28 +612,13 @@ class Core {
       }
     }
 
-    switch ( $strategy ) {
-      case 'no_tika':
-        $combinedEntries = $otherEntries;
-        break;
-      case 'prefer_other':
-        $combinedEntries = $otherEntries ?: $tikaEntries;
-        break;
-      case 'combine':
-        $combinedEntries = array_merge( $tikaEntries, $otherEntries );
-        break;
-      case 'prefer_tika':
-        $combinedEntries = $tikaEntries ?: $otherEntries;
-        break;
-      case 'only_tika':
-        $combinedEntries = $tikaEntries;
-        break;
-      default:
-        self::unreachable();
-        // TODO(maddog) Remove following when phan false positives go away.
-        // @phan-suppress-next-line PhanPluginUnreachableCode
-        $combinedEntries = []; // @phan-suppress-current-line PhanUnusedVariable
-    }
+    $combinedEntries = match ( $strategy ) {
+      MetadataStrategy::NoTika => $otherEntries,
+      MetadataStrategy::PreferOther => $otherEntries ?: $tikaEntries,
+      MetadataStrategy::Combine => array_merge( $tikaEntries, $otherEntries ),
+      MetadataStrategy::PreferTika => $tikaEntries ?: $otherEntries,
+      MetadataStrategy::OnlyTika => $tikaEntries,
+    };
     if ( count( $combinedEntries ) === 0 ) {
       return null;
     }
@@ -817,76 +838,52 @@ class Core {
   /**
    * Merge two text content strings according to tika-vs-other strategy.
    *
-   * @param string $strategy - see TypeProfile::CONTENT_STRATEGIES
+   * @param ContentStrategy $strategy
    * @param ?string $other - possibly-null "other" content
    * @param string $tika - Tika-sourced content
    *
    * @return ?string merged content
    */
   private static function mergeContent(
-      string $strategy, ?string $other, string $tika ): ?string {
-    switch ( $strategy ) {
-      case 'no_tika':
-        return $other;
-      case 'prefer_other':
-        return $other ?? $tika;
-      case 'combine':
-        if ( ( $other ?? '' ) === '' ) {
-          return $tika;
-        } elseif ( $tika === '' ) {
-          return $other;
-        } /* else */
-        self::insist( $other !== null ); // phan can't figure this out itself.
-        return implode( "\n", [ $other, $tika ] );
-      case 'prefer_tika':
-        return ( $tika !== '' ) ? $tika : $other;
-      case 'only_tika':
-        return $tika;
-      default:
-        self::unreachable();
-    }
-    // TODO(maddog) Remove following when phan false positives go away.
-    // @phan-suppress-next-line PhanPluginUnreachableCode
-    return null; // Suppress a phan warning; we should never actually get here.
+      ContentStrategy $strategy, ?string $other, string $tika ): ?string {
+    return match ( $strategy ) {
+      ContentStrategy::NoTika => $other,
+      ContentStrategy::PreferOther => $other ?? $tika,
+      ContentStrategy::Combine =>
+      ( ($other ?? '') === '' ) ? $tika
+      : ( ( $tika === '' ) ? $other
+          : implode( "\n", [ static::insistNonNull($other), $tika ] ) ),
+      ContentStrategy::PreferTika => ( $tika !== '' ) ? $tika : $other,
+      ContentStrategy::OnlyTika => $tika,
+    };
   }
 
 
   /**
    * Merge two "formatMetadata" arrays according to tika-vs-other strategy
    *
-   * @param string $strategy - see TypeProfile::METADATA_STRATEGIES
+   * @param MetadataStrategy $strategy
    * @param ?array $tika - Tika-sourced formatted metadata
    * @param ?array $other - possibly-null "other" formatted metadata
    *
    * @return ?array merged formatted metadata
    */
   private static function mergeMwFormattedMetadata(
-      string $strategy, ?array $tika, ?array $other ): ?array {
-    switch ( $strategy ) {
-      case 'no_tika':
-        return $other;
-      case 'prefer_other':
-        return $other ?? $tika;
-      case 'combine':
-        if ( ( $tika === null ) && ( $other === null ) ) {
-          return null;
-        }
-        // Tika properties come after other, within each visibility category.
-        return [
-            'visible' => array_merge( ( $other ?? [] )['visible'] ?? [],
-                                      ( $tika ?? [] )['visible'] ?? [] ),
-            'collapsed' => array_merge( ( $other ?? [] )['collapsed'] ?? [],
-                                        ( $tika ?? [] )['collapsed'] ?? [] ),
-                ];
-      case 'prefer_tika':
-        return $tika ?? $other;
-      case 'only_tika':
-        return $tika;
-      default:
-        self::unreachable();
-    }
-    // TODO(maddog) Remove following when phan false positives go away.
-    // @phan-suppress-next-line PhanPluginUnreachableCode
-    return null; // Suppress a phan warning; we should never actually get here.
+      MetadataStrategy $strategy, ?array $tika, ?array $other ): ?array {
+    return match ( $strategy ) {
+      MetadataStrategy::NoTika => $other,
+      MetadataStrategy::PreferOther => $other ?? $tika,
+      MetadataStrategy::Combine =>
+      ( ( $tika === null ) && ( $other === null ) ) ? null :
+      // Tika properties come after other, within each visibility category.
+      [
+          'visible' => array_merge( ( $other ?? [] )['visible'] ?? [],
+                                    ( $tika ?? [] )['visible'] ?? [] ),
+          'collapsed' => array_merge( ( $other ?? [] )['collapsed'] ?? [],
+                                      ( $tika ?? [] )['collapsed'] ?? [] ),
+       ],
+      MetadataStrategy::PreferTika => $tika ?? $other,
+      MetadataStrategy::OnlyTika => $tika,
+    };
   }
 }

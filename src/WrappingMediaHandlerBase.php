@@ -27,6 +27,8 @@ namespace MediaWiki\Extension\TikaAllTheFiles;
 use File;
 use MediaHandler;
 
+use MediaWiki\Extension\TikaAllTheFiles\Enums\MetadataStrategy;
+
 
 class WrappingMediaHandlerBase extends MediaHandler {
 
@@ -111,7 +113,7 @@ class WrappingMediaHandlerBase extends MediaHandler {
     $otherSerialized = $this->relegateTo( __FUNCTION__, ...func_get_args() );
 
     $strategy = $this->typeProfile->metadataStrategy;
-    if ( $strategy === 'no_tika' ) {
+    if ( $strategy === MetadataStrategy::NoTika ) {
       return $otherSerialized;
     }
 
@@ -151,7 +153,7 @@ class WrappingMediaHandlerBase extends MediaHandler {
   public function formatMetadata( $file, $context = false ) {
     $otherFormattedMetadata =
         $this->relegateTo( __FUNCTION__, ...func_get_args() );
-    if ( $this->typeProfile->metadataStrategy === 'no_tika' ) {
+    if ( $this->typeProfile->metadataStrategy === MetadataStrategy::NoTika ) {
       return $otherFormattedMetadata;
     }
 
