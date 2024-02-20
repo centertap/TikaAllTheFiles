@@ -29,9 +29,11 @@ use File;
 use FormatMetadata;
 use GlobalVarConfig;
 use IContextSource;
+use LogicException;
 use MediaWiki\Logger\LoggerFactory;
 use MWException;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
 
 use MediaWiki\Extension\TikaAllTheFiles\Enums\ContentComposition;
 use MediaWiki\Extension\TikaAllTheFiles\Enums\ContentStrategy;
@@ -117,29 +119,29 @@ class Core {
 
 
   /**
-   * Strictly assert a runtime invariant, logging an error and backtrace
-   * if $condition is false.
+   * Strictly assert a runtime invariant.  If $condition is false., log an
+   * error/backtrace and throw an unchecked exception.
    *
    * @param bool $condition the asserted condition
    * @phan-assert-true-condition $condition
    * @param string $msg description of the condition
    *
    * @return void This function returns no value.
-   * @throws MWException if $condition is false.
    */
   public static function insist( bool $condition, string $msg = '' ): void {
     if ( !$condition ) {
       // The $callerOffset parameter "2" tells wfLogWarning to identify
       // the function/line that called us as the location of the error.
       wfLogWarning( self::LOG_GROUP . ' Failed to insist that: ' . $msg, 2 );
-      throw new MWException( 'Failed to insist that: ' . $msg );
+      throw new LogicException( 'Failed to insist that: ' . $msg );
     }
   }
 
 
   /**
    * Strictly assert that a value is non-null, and return the value.
-   * Logs an error and backtrace if the value is null.
+   * If the value is null, log an error/backtrace and throw an unchecked
+   * exception.
    *
    * This is useful when phan's static analysis is not clever enough to
    * figure out that a passed value will be non-null, but suppressing a
@@ -151,31 +153,29 @@ class Core {
    * @param string $msg description of the condition
    *
    * @return T the non-null input value.
-   * @throws MWException if $value is null.
    */
   public static function insistNonNull( $value, string $msg = '' ) {
     if ( $value === null ) {
       // The $callerOffset parameter "2" tells wfLogWarning to identify
       // the function/line that called us as the location of the error.
       wfLogWarning( self::LOG_GROUP . ' Unexpected null value: ' . $msg, 2 );
-      throw new MWException( 'Unexpected null value: ' . $msg );
+      throw new LogicException( 'Unexpected null value: ' . $msg );
     }
     return $value;
   }
 
 
   /**
-   * Log an error and backtrace indicating that purportedly unreachable code
-   * has in fact been reached.
+   * Log an error/backtrace and throw an unchecked exception, indicating that
+   * purportedly unreachable code has in fact been reached.
    *
    * @return never
-   * @throws MWException always.
    */
-  public static function unreachable()/*: never*/ {
+  public static function unreachable(): never {
     // The $callerOffset parameter "2" tells wfLogWarning to identify
     // the function/line that called us as the location of the error.
     wfLogWarning( self::LOG_GROUP . ' REACHED THE UNREACHABLE', 2 );
-    throw new MWException( 'REACHED THE UNREACHABLE' );
+    throw new LogicException( 'REACHED THE UNREACHABLE' );
   }
 
 
@@ -651,12 +651,12 @@ class Core {
 
     $inputFile = fopen( $filePath, 'r' );
     if ( $inputFile === false ) {
-      throw new MWException( "Failed to open '{$filePath}' for read" );
+      throw new RuntimeException( "Failed to open '{$filePath}' for read" );
     }
     try {
       $inputSize = filesize( $filePath );
       if ( $inputSize === false ) {
-        throw new MWException( "Failed to get size of '{$filePath}'" );
+        throw new RuntimeException( "Failed to get size of '{$filePath}'" );
       }
 
       $options = [
@@ -769,17 +769,16 @@ class Core {
    *  request fails due to a curl error; otherwise it will be a string with
    *  the result of the request.  status is the integer HTTP status code
    *  (e.g., 200, 404, ...) status is only meaningful if response is not false.
-   * @throws MWException for errors in preparing the curl request
    */
   private function executeCurl( array $options ) {
     $curl = curl_init();
     if ( !$curl ) {
-      throw new MWException( "curl_init() failed." );
+      throw new RuntimeException( "curl_init() failed." );
     }
     try {
       foreach ( $options as $option => $value ) {
         if ( !curl_setopt( $curl, $option, $value ) ) {
-          throw new MWException(
+          throw new RuntimeException(
               "Set curl option {$option} to {$value} failed." );
         }
       }
