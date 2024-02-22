@@ -249,7 +249,15 @@ class Core {
       ContentComposition::Metadata => true,
       ContentComposition::TextAndMetadata => false,
     };
-    $response = $this->queryTika( $typeProfile, $filePath, $onlyMetadata );
+    try {
+      $response = $this->queryTika( $typeProfile, $filePath, $onlyMetadata );
+    } catch ( TikaParserException $e ) {
+      $this->ignoreOrRethrow( $e, $typeProfile->ignoreContentParsingErrors );
+      $response = [];
+    } catch ( TikaSystemException $e ) {
+      $this->ignoreOrRethrow( $e, $typeProfile->ignoreContentServiceErrors );
+      $response = [];
+    }
 
     $this->logger->debug( 'Tika response:  {response}',
                           [ 'response' => $response ] );
@@ -309,8 +317,17 @@ class Core {
       return $otherMetadata;
     }
 
-    $response = $this->queryTika( $typeProfile, $filePath,
-                                  /*$onlyMetadata:*/true );
+    try {
+      $response = $this->queryTika( $typeProfile, $filePath,
+                                    /*$onlyMetadata:*/true );
+    } catch ( TikaParserException $e ) {
+      $this->ignoreOrRethrow( $e, $typeProfile->ignoreMetadataParsingErrors );
+      $response = [];
+    } catch ( TikaSystemException $e ) {
+      $this->ignoreOrRethrow( $e, $typeProfile->ignoreMetadataServiceErrors );
+      $response = [];
+    }
+
     $this->logger->debug( 'Tika response:  {response}',
                           [ 'response' => var_export( $response, true ) ] );
     $tikaMetadata = $response;
@@ -897,5 +914,23 @@ class Core {
       MetadataStrategy::PreferTika => $tika ?? $other,
       MetadataStrategy::OnlyTika => $tika,
     };
+  }
+
+
+  /**
+   * Ignore or rethrow an exception.
+   *
+   * @param \Exception $e - the exception
+   * @param bool $ignore - if true, merely log the exception; otherwise, rethrow.
+   *
+   * @return void
+   *
+   * @throws \Exception
+   */
+  public function ignoreOrRethrow( \Exception $e, bool $ignore ): void {
+    if ( !$ignore ) {
+      throw $e;
+    }
+    $this->logger->warning( "Ignoring exception:  {$e}" );
   }
 }

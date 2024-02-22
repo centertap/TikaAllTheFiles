@@ -43,7 +43,11 @@
             "ocr_languages": "",
             "content_strategy": "combine",
             "content_composition": "text",
-            "metadata_strategy": "prefer_other"
+            "metadata_strategy": "prefer_other",
+            "ignore_content_service_errors": false,
+            "ignore_content_parsing_errors": false,
+            "ignore_metadata_service_errors": false,
+            "ignore_metadata_parsing_errors": false
           },
           "*": "defaults"
         },

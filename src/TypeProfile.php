@@ -50,6 +50,18 @@ class TypeProfile {
   /** @var MetadataStrategy Strategy for choosing metadata sources */
   public MetadataStrategy $metadataStrategy;
 
+  /** @var bool Ignore service errors while extracting content? */
+  public bool $ignoreContentServiceErrors;
+
+  /** @var bool Ignore parsing errors while extracting content? */
+  public bool $ignoreContentParsingErrors;
+
+  /** @var bool Ignore service errors while extracting metadata? */
+  public bool $ignoreMetadataServiceErrors;
+
+  /** @var bool Ignore parsing errors while extracting metadata? */
+  public bool $ignoreMetadataParsingErrors;
+
 
   // TODO(maddog) Does it really make sense to ever return null, or is it
   //              better to just explode if no valid/complete profile can
@@ -92,6 +104,10 @@ class TypeProfile {
         'contentComposition' => ['content_composition',
                                  ContentComposition::from(...)],
         'metadataStrategy' => ['metadata_strategy', MetadataStrategy::from(...)],
+        'ignoreContentServiceErrors' => ['ignore_content_service_errors', fn ($x) => $x],
+        'ignoreContentParsingErrors' => ['ignore_content_parsing_errors', fn ($x) => $x],
+        'ignoreMetadataServiceErrors' => ['ignore_metadata_service_errors', fn ($x) => $x],
+        'ignoreMetadataParsingErrors' => ['ignore_metadata_parsing_errors', fn ($x) => $x],
                    ];
     while ( $label !== null ) {
       $block = self::resolveStringLabel( $label, $configMap, $visitedLabels );
