@@ -31,13 +31,14 @@ use GlobalVarConfig;
 use IContextSource;
 use LogicException;
 use MediaWiki\Logger\LoggerFactory;
-use MWException;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 use MediaWiki\Extension\TikaAllTheFiles\Enums\ContentComposition;
 use MediaWiki\Extension\TikaAllTheFiles\Enums\ContentStrategy;
 use MediaWiki\Extension\TikaAllTheFiles\Enums\MetadataStrategy;
+use MediaWiki\Extension\TikaAllTheFiles\Exceptions\TikaParserException;
+use MediaWiki\Extension\TikaAllTheFiles\Exceptions\TikaSystemException;
 
 /**
  * Common core functionality used by multiple TATF components
@@ -225,7 +226,6 @@ class Core {
    *  another handler, already formatted as by MediaHandler::formatMetadata()
    *
    * @return ?string - returns a string or null
-   * @throws MWException in case of errors
    */
   public function generateTextContent(
       TypeProfile $typeProfile,
@@ -297,7 +297,6 @@ class Core {
    *  another handler
    *
    * @return ?array - returns an array of metadata, or null
-   * @throws MWException in case of errors
    */
   public function generateMetadata( TypeProfile $typeProfile,
                                     string $filePath,
@@ -636,10 +635,9 @@ class Core {
    *
    * @return array of Tika properties
    *
-   * @throws MWException if failure to set up the Tika query or unable to
+   * @throws TikaSystemException if failure to set up the Tika query or unable to
    *  communicate with Tika server
-   *
-   * TODO(maddog) Work out the error/failure conditions better.
+   * @throws TikaParserException if Tika tries but fails to perform the query
    */
   private function queryTika( TypeProfile $typeProfile,
                               string $filePath,
@@ -718,32 +716,53 @@ class Core {
       $this->logger->debug( "curl options: " . var_export( $options, true ) );
 
       while ( $triesRemaining > 0 ) {
-        [ $response, $httpStatus ] = self::executeCurl( $options );
+        --$triesRemaining;
+        [ $response, $status ] = self::executeCurl( $options );
 
-        if ( $response !== false ) {
-          switch ( $httpStatus ) {
-            case 200:
-              // "Ok - request completed sucessfully"
+        if ( $response === false ) {
+          // curl failed for some reason.  $status is libcurl errno.
+          switch ( $status ) {
+            case CURLE_OPERATION_TIMEDOUT: // #28 CURLOPT_TIMEOUT was reached.
+              throw new TikaParserException(
+                  "Curl timeout during tika request (curl error {$status}) for {$filePath}" );
+            case CURLE_GOT_NOTHING: // #52 Tika hit taskTimeoutMillis limit
+              throw new TikaParserException(
+                  "Probable tika taskTimeout during tika request (curl error {$status}) for {$filePath}" );
+            case CURLE_COULDNT_CONNECT: // #7
+            case CURLE_RECV_ERROR: // #56
+            default:
+              // 7 and 56 are probably due to Tika restarting itself (from
+              // an earlier error/timeout, potentially on a different document).
+              //
+              // Either way, go ahead and retry.
+              break;
+          }
+        } else { // $response is *not* false.
+          // Tika responded.  $status is the HTTP response code.
+          if ( $status !== 200 ) {
+            $this->logger->warning( "Tika responded with status {$status}" );
+          }
+          switch ( $status ) {
+            case 200:  // "Ok - request completed successfully"
               $decoded = json_decode( $response, true /*as array*/ );
               // Result *should* be an array (not a single atomic value).
               self::insist( is_array( $decoded ) );
               return $decoded;
-            case 204: // "No content - request completed sucessfully, result is empty"
-            case 422: // "Unprocessable Entity - Unsupported mime-type, encrypted document & etc"
-              // TODO(maddog) Log a warning for the 422 case (and maybe 204)
-              //              or, perhaps throw an exception?
+            case 204: // "No content - request completed successfully, result is empty"
               return [];
-            case 500: // "Error - Error while processing document"
+            case 422: // "Unprocessable Entity - Unsupported mime-type, encrypted document, etc"
+              throw new TikaParserException(
+                  "Tika status 422 (unprocessable entity) for {$filePath}" );
             case 503: // "Service Unavailable"
+            case 500: // "Error - Error while processing document"
+            default:
               // 503 can occur if Tika is restarting its child process (e.g., if
               // an earlier request caused it to keel over).
-            default:
+              //
               // In all these cases, just continue to (maybe) retry.
               break;
           }
-          $this->logger->warning( "Tika responded with status {$httpStatus}" );
         }
-        --$triesRemaining;
         if ( $triesRemaining > 0 ) {
           $this->logger->warning( "Retrying Tika query for {$filePath}" );
         }
@@ -752,7 +771,7 @@ class Core {
       } // while ( $triesRemaining > 0 )
 
       // Retries exhausted.  Oh, well, at least we (re)tried.
-      throw new MWException( "Tika query exhausted retries for {$filePath}" );
+      throw new TikaSystemException( "Tika query exhausted retries for {$filePath}" );
     }
     finally {
       fclose( $inputFile );
@@ -765,10 +784,11 @@ class Core {
    *
    * @param array<int,mixed> $options CURLOPT_ parameters for the request
    *
-   * @return array of [response, status].  response will be false if the
-   *  request fails due to a curl error; otherwise it will be a string with
-   *  the result of the request.  status is the integer HTTP status code
-   *  (e.g., 200, 404, ...) status is only meaningful if response is not false.
+   * @return array{string|false, int} of [response, status].  If the request succeeds, response
+   *  will be a string with the result of the request and status will be the
+   *  integer HTTP status code (e.g., 200, 404, ...).  If the request fails,
+   *  due to a curl error, response will be false and status will be the
+   *  curl_errno() code.
    */
   private function executeCurl( array $options ) {
     $curl = curl_init();
@@ -786,23 +806,16 @@ class Core {
       $response = curl_exec( $curl );
 
       $totalTimeSeconds = curl_getinfo( $curl, CURLINFO_TOTAL_TIME_T ) / 1e6;
-      $this->logger->debug( "Tika transaction took {$totalTimeSeconds}s" );
+      $this->logger->debug( "Curl transaction took {$totalTimeSeconds}s" );
 
-      // TODO(maddog) Should we try to diagnose timeout errors specially?
-      //              ...probably yes --- it is unlikely that trying again
-      //              will make anything go faster.
-      //              (or do something more clever, like retry without OCR)
-      //
-      //              (FYI:  timeout is curl_errno CURLE_OPERATION_TIMEDOUT.)
       if ( ( $response === false ) || ( curl_errno( $curl ) !== 0 ) ) {
         $errno = curl_errno( $curl );
         $error = curl_error( $curl );
-        $this->logger->warning(
-            "Curl error {$errno} while trying to query Tika:  {$error}" );
-        $response = false;
+        $this->logger->warning( "Curl error {$errno}:  {$error}" );
+        return [ false, $errno ];
       }
 
-      $status = curl_getinfo( $curl, CURLINFO_HTTP_CODE );
+      $status = curl_getinfo( $curl, CURLINFO_RESPONSE_CODE );
       return [ $response, $status ];
     }
     finally {
