@@ -61,7 +61,8 @@
     },
     "AutoloadNamespaces": {
         "MediaWiki\\Extension\\TikaAllTheFiles\\": "src/",
-        "MediaWiki\\Extension\\TikaAllTheFiles\\Enums\\": "src/enums/"
+        "MediaWiki\\Extension\\TikaAllTheFiles\\Enums\\": "src/enums/",
+        "MediaWiki\\Extension\\TikaAllTheFiles\\Exceptions\\": "src/exceptions/"
     },
     "HookHandlers": {
       "TatfHooks": {
