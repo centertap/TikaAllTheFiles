@@ -195,6 +195,7 @@ of `$wgTikaAllTheFiles_` which has been omitted here for brevity:
 | `QueryTimeoutSeconds`    | 5                        | Tika server response time limit (seconds)    |
 | `QueryRetryCount`        | 2                        | Number of times to retry a failed Tika query |
 | `QueryRetryDelaySeconds` | 2                        | Delay (seconds) before query retry           |
+| `LocalCacheSize`         | 16                       | Number of entries in the local query cache   |
 | `MimeTypeProfiles`       | *see below*              | Handler configuration, by mime-type          |
 | `PropertyMap`            | `[]`                     | Additional mappings for Tika metadata        |
 
@@ -228,6 +229,15 @@ your Tika server.  More details on the parameters follow below.
    * Specifies the number of seconds TATF will wait before retrying a
      Tika query.
 
+### General caching parameters
+
+ * `$wgTikaAllTheFiles_LocalCacheSize`
+   * integer, default value: `16`
+   * Specifies the number of entries in the process-local LRU cache of Tika
+     query responses.  Within a single MediaWiki web-request process, TATF
+     will retain the Tika responses for this many different files.  If set
+     to a value < 1, this cache layer is disabled.
+
 <a name="handler-profiles"/>
 
 ### Handler profiles
@@ -247,6 +257,9 @@ your Tika server.  More details on the parameters follow below.
                         'ignore_content_parsing_errors' => false,
                         'ignore_metadata_service_errors' => false,
                         'ignore_metadata_parsing_errors' => false,
+                        'cache_expire_success_before': false,
+                        'cache_expire_failure_before': false,
+                        'cache_file_backend': false,
                       ],
         '*' => 'defaults',
      ]
@@ -266,11 +279,18 @@ The effect of the built-in default profile configuration (shown above) is:
 * The TATF handler will provide Tika-extracted metadata to display on
   a file's File: page.
 * Errors encountered while querying Tika will not be ignored.
+* Cached Tika responses will not be expired.
+* No persistent, file-based cache will be used.
 ```
 
-#### Another profile configuration example
+#### Profile configuration example: building on the defaults
 
-If you put the following in `LocalSettings.php`:
+To customize the configuration, it is best to leave the `defaults` profile
+alone; new versions of TATF may add new default parameters to try to allow
+for a seamless upgrades.  Instead, create a profile that inherits from the
+`defaults` profile, and make all your modifications there.
+
+For example, if you put the following in `LocalSettings.php`:
 ```php
 $wgTikaAllTheFiles_MimeTypeProfiles['*'] = [
     'inherit' => 'defaults',
@@ -278,6 +298,7 @@ $wgTikaAllTheFiles_MimeTypeProfiles['*'] = [
     'allow_ocr' => true,
     'content_composition' => 'text_and_metadata',
     'metadata_strategy' => 'combine',
+    'cache_file_backend' => 'my-tatf-cache',
     ];
 
 $wgTikaAllTheFiles_MimeTypeProfiles['application/pdf'] = [
@@ -293,6 +314,8 @@ it will build on top of the built-in defaults with the result:
 * The TATF handler will provide both Tika-extracted text and metadata for
   search indexing, and combine that content with any content produced by
   a wrapped handler.
+* TATF will persistently cache Tika responses in a file-backend called
+  `'my-tatf-cache'`.
 * Text extraction will use OCR if it is available --- but not for PDF files!
 * The TATF handler will combine Tika-extracted metadata along with metadata
   from a wrapped handler, for display on a file's File: page.
@@ -385,6 +408,21 @@ A complete profile requires values for each of the following parameters:
     * When a parameter is `false`, errors in the given context become exceptions
       thrown to the caller.  When `true`, errors are ignored and treated as if
       Tika produced a valid, but empty, response.
+ * `'cache_expire_success_before'`: string|`false`
+ * `'cache_expire_failure_before'`: string|`false`
+    * The above two parameters control expiration of Tika cache entries.
+    * If `false`, no expiration occurs.  Otherwise, the value must be a string
+      containing a timestamp in RFC3339_EXTENDED format, e.g.,
+      `'2021-02-14T20:54:32.171+00:00'`.
+    * Expiry for successful queries and failed queries can be configured
+      independently.  This allows one, for example, to tweak a system's Tika
+      configuration and reprocess files through TATF... but only those files
+      for which earlier Tika queries had failed.
+ * `'cache_file_backend'`: string|`false`
+   * The name of the FileBackend to use for persistent caching of responses
+     from Tika queries, or `false` to disable file-based caching.
+   * See [Tika Response Caching](#response-caching) for advice on setting up
+     and using a persistent cache.
 
 ### Metadata property processing
 
@@ -444,6 +482,78 @@ be either `null` (if the property should be discarded) or an instance of
 you should look at the code to understand how/why to construct a
 `ProcessedProperty`.
 
+<a name="response-caching"/>
+
+### Tika Response Caching
+
+**TikaAllTheFiles** (TATF) implements two layers of caching of Tika responses:
+  * an ephemeral process-local LRU (least-recently-used) layer;
+  * a persistent file-based layer.
+
+The cache keeps track of both Tika query successes and failures, indexed by
+the SHA1 hash of the contents of queried files, not the pathnames of files.
+(Files often move around the system during uploads, and the same file could
+also be uploaded multiple times with different filenames.)
+
+The process-local cache layer is enabled by default, and there is no known
+reason to ever disable it under normal operating circumstances.  Due to its
+internal wiring, MediaWiki tends to ask TATF for metadata for the same file
+multiple times during a single web request while uploading a single file.
+This cache layer prevents TATF from unnecessarily repeatedly querying Tika
+during such requests.
+
+The file-based cache layer is not enabled by default, as it requires
+configuration of a place to store the files.  This layer is configured by
+the `'cache_file_backend'` parameter within the handler profiles.  This
+allows it to be customized per MIME-type, if one has a need for that.
+(E.g., file-based caching could be enabled only for file types for which
+OCR text extraction is also enabled, or different file types could have
+their cache-files stored in different places.)
+
+The entire cache system can be configured to have cache entries expire.
+Expiration of cached successes and cached failures are configured
+independently of each other.  This is also controlled per MIME-type by
+parameters in type profiles:  `'cache_expire_success_before'` and
+`'cache_expire_failure_before'`.
+
+To set up a persistent file-based cache on the local filesystem:
+
+  1. Create an appropriate directory on the local filesystem.
+     - The directory must be writable by MediaWiki (e.g., by the
+       web server).
+     - The directory should **not** be served to the internet by
+       the web server.  E.g., do not stick your TATF cache into
+       the `images/` directory from which media files are served.
+     - For this example, we will name the directory
+       `/somewhere/on/disk/amazing-tatf-cache/`.
+  2. Define a `LockManager` in `$wgLockManagers`.  For example:
+     ```php
+     $wgLockManagers[] = [
+         'name' => 'my-tatf-lock-manager',
+         'class' => FSLockManager::class,
+         'lockDirectory' => "/somewhere/on/disk/amazing-tatf-cache/lockdir",
+     ];
+     ```
+  3. Define the `FileBackend` in `$wgFileBackends`.  For example:
+     ```php
+     $wgFileBackends[] = [
+         'name' => 'my-tatf-cache',
+         'class' => FSFileBackend::class,
+         'domainId' => '',
+         'lockManager' => 'my-tatf-lock-manager',
+         'basePath' => "/somewhere/on/disk/amazing-tatf-cache",
+         'fileMode' => 0644,
+         'directoryMode' => 0755,
+     ];
+
+     ```
+  4. In an appropriate TATF handler profile (`$wgTikaAllTheFiles_Mime_Type_Profiles`),
+     set the parameter `'cache_file_backend'` to `'my-tatf-cache'`.
+
+File-based caching should work with any `FileBackend` provided by MediaWiki,
+e.g., there are extensions that facilitate connecting to various cloud-based
+storage backends.
+
 <a name="maintenance"/>
 
 ## Post-configuration / Maintenance
@@ -465,7 +575,7 @@ with `metadata_strategy` other than `no_tika`), then you can force a refresh
 of metadata for all uploaded files like so:
 ```
 $ cd YOUR-WIKI-INSTALL-DIRECTORY/maintenance
-$ php refreshMetadata.php --force
+$ php refreshImageMetadata.php --force
 ```
 It is possible to refresh only a subset of files.  See
 https://www.mediawiki.org/wiki/Manual:RefreshImageMetadata.php

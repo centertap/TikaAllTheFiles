@@ -24,6 +24,10 @@ declare( strict_types = 1 );
 
 namespace MediaWiki\Extension\TikaAllTheFiles;
 
+use \DateTimeImmutable;
+use \DateTimeInterface;
+use \RuntimeException;
+
 use MediaWiki\Extension\TikaAllTheFiles\Enums\{ ContentComposition,
                                                 ContentStrategy,
                                                 HandlerStrategy,
@@ -61,6 +65,15 @@ class TypeProfile {
 
   /** @var bool Ignore parsing errors while extracting metadata? */
   public bool $ignoreMetadataParsingErrors;
+
+  /** @var ?DateTimeImmutable Expire success results from earlier than... */
+  public ?DateTimeImmutable $expireEarlierSuccess;
+
+  /** @var ?DateTimeImmutable Expire failure results from earlier than... */
+  public ?DateTimeImmutable $expireEarlierFailure;
+
+  /** @var false|string Name of the FileBackend to use for file-cache */
+  public false|string $cacheFileBackend;
 
 
   // TODO(maddog) Does it really make sense to ever return null, or is it
@@ -108,6 +121,11 @@ class TypeProfile {
         'ignoreContentParsingErrors' => ['ignore_content_parsing_errors', fn ($x) => $x],
         'ignoreMetadataServiceErrors' => ['ignore_metadata_service_errors', fn ($x) => $x],
         'ignoreMetadataParsingErrors' => ['ignore_metadata_parsing_errors', fn ($x) => $x],
+        'expireEarlierSuccess' => ['cache_expire_success_before',
+                                   self::parseOptionalDateTime(...)],
+        'expireEarlierFailure' => ['cache_expire_failure_before',
+                                   self::parseOptionalDateTime(...)],
+        'cacheFileBackend' => ['cache_file_backend', fn ($x) => $x],
                    ];
     while ( $label !== null ) {
       $block = self::resolveStringLabel( $label, $configMap, $visitedLabels );
@@ -138,6 +156,30 @@ class TypeProfile {
     $remaining = implode( ', ', array_column( $unresolved, 0 ) );
     Core::warn( "Unable to create a complete profile for label '{$rootLabel}'; unresolved values for: {$remaining}" );
     return null;
+  }
+
+
+  /**
+   * Parse an optional string in RFC3339_EXTENDED format into a date-time.
+   *
+   * @param false|string $s the optional string
+   *
+   * @return ?DateTimeImmutable  null if $s is false, otherwise
+   *   parse $s as a date-time with timezone.
+   */
+  private static function parseOptionalDateTime( false|string $s
+                                                 ): ?DateTimeImmutable {
+    if ( $s === false ) {
+      return null;
+    }
+    $result = DateTimeImmutable::createFromFormat(
+        DateTimeInterface::RFC3339_EXTENDED, $s );
+    if ( $result === false ) {
+      throw new RuntimeException(
+          "Bad parse of date-time string '{$s}':\n" .
+          var_export( DateTimeImmutable::getLastErrors(), true ) );
+    }
+    return $result;
   }
 
 

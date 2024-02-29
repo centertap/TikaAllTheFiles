@@ -35,6 +35,10 @@
         "value": 2,
         "description": "Delay (seconds) before retrying a failed Tika query"
       },
+      "TikaAllTheFiles_LocalCacheSize": {
+        "value": 16,
+        "description": "Size (entries) of process-local Tika response cache"
+      },
       "TikaAllTheFiles_MimeTypeProfiles": {
         "value": {
           "defaults": {
@@ -47,7 +51,10 @@
             "ignore_content_service_errors": false,
             "ignore_content_parsing_errors": false,
             "ignore_metadata_service_errors": false,
-            "ignore_metadata_parsing_errors": false
+            "ignore_metadata_parsing_errors": false,
+            "cache_expire_success_before": false,
+            "cache_expire_failure_before": false,
+            "cache_file_backend": false
           },
           "*": "defaults"
         },

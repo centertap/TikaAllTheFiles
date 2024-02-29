@@ -43,7 +43,7 @@ use MediaWiki\Extension\TikaAllTheFiles\Exceptions\TikaSystemException;
 /**
  * Common core functionality used by multiple TATF components
  */
-class Core {
+class Core implements TikaQueryProvider {
   /**
    * Prefix for our global configuration parameters
    */
@@ -63,6 +63,9 @@ class Core {
 
   /** @var MetadataMapper - a MetadataMapper instance to use over and over */
   private MetadataMapper $metadataMapper;
+
+  /** @var QueryCache - our query cache */
+  private QueryCache $queryCache;
 
 
   /**
@@ -201,6 +204,8 @@ class Core {
     //    ->makeConfig( 'TikaAllTheFiles' );
     $this->config = new GlobalVarConfig( self::CONFIG_PREFIX );
     $this->metadataMapper = new MetadataMapper( $this->logger, $this->config );
+    $this->queryCache = new QueryCache( $this->logger,
+                                        $this->config->get( 'LocalCacheSize' ) );
   }
 
 
@@ -249,22 +254,18 @@ class Core {
       ContentComposition::Metadata => true,
       ContentComposition::TextAndMetadata => false,
     };
+    $tikaMetadata = [];
+    $tikaContent = '';
     try {
-      $response = $this->queryTika( $typeProfile, $filePath, $onlyMetadata );
+      [ $tikaMetadata,
+        [$tikaContent, ] ] = $this->queryCache->queryCacheOrTika(
+            $this, $typeProfile, $filePath, $onlyMetadata );
     } catch ( TikaParserException $e ) {
       $this->ignoreOrRethrow( $e, $typeProfile->ignoreContentParsingErrors );
-      $response = [];
     } catch ( TikaSystemException $e ) {
       $this->ignoreOrRethrow( $e, $typeProfile->ignoreContentServiceErrors );
-      $response = [];
     }
-
-    $this->logger->debug( 'Tika response:  {response}',
-                          [ 'response' => $response ] );
-
-    $tikaContent = trim( $response["X-TIKA:content"] ?? '' );
-    // Remove tika-content from the response, leaving all the other metadata.
-    unset( $response["X-TIKA:content"] );
+    self::insist( is_string( $tikaContent ) );
 
     switch ( $typeProfile->contentComposition ) {
       case ContentComposition::Text:
@@ -276,7 +277,7 @@ class Core {
         // formatted a little differently).  The point is to allow the user
         // to search for something they saw in the displayed metadata.
         $formattedMetadata = $this->formatMetadataForTextContent(
-            $typeProfile, $response, $otherFormattedMetadata,
+            $typeProfile, $tikaMetadata, $otherFormattedMetadata,
             /*context=*/false );
         $this->logger->debug( "Add metadata to content\n {$formattedMetadata}" );
         if ( $formattedMetadata ) {
@@ -317,20 +318,15 @@ class Core {
       return $otherMetadata;
     }
 
+    $tikaMetadata = [];
     try {
-      $response = $this->queryTika( $typeProfile, $filePath,
-                                    /*$onlyMetadata:*/true );
+      [ $tikaMetadata, ] = $this->queryCache->queryCacheOrTika(
+          $this, $typeProfile, $filePath, /*$onlyMetadata:*/true );
     } catch ( TikaParserException $e ) {
       $this->ignoreOrRethrow( $e, $typeProfile->ignoreMetadataParsingErrors );
-      $response = [];
     } catch ( TikaSystemException $e ) {
       $this->ignoreOrRethrow( $e, $typeProfile->ignoreMetadataServiceErrors );
-      $response = [];
     }
-
-    $this->logger->debug( 'Tika response:  {response}',
-                          [ 'response' => var_export( $response, true ) ] );
-    $tikaMetadata = $response;
 
     // 'no_tika' strategy has already been taken care of.
     // For all other strategies, we try to sneak $tikaMetadata into the
@@ -656,9 +652,9 @@ class Core {
    *  communicate with Tika server
    * @throws TikaParserException if Tika tries but fails to perform the query
    */
-  private function queryTika( TypeProfile $typeProfile,
-                              string $filePath,
-                              bool $onlyMetadata ): array {
+  public function queryTika( TypeProfile $typeProfile,
+                             string $filePath,
+                             bool $onlyMetadata ): array {
     $tikaUrl = $this->config->get( 'TikaServiceBaseUrl' );
     $queryTimeoutSeconds = $this->config->get( 'QueryTimeoutSeconds' );
     $triesRemaining = 1 + $this->config->get( 'QueryRetryCount' );
