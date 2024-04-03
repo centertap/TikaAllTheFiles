@@ -53,9 +53,10 @@ CTAP All The Donations!
 
 To make use of **TikaAllTheFiles** (TATF), you will need:
 
- * PHP >= 7.4.0
+ * PHP >= 8.1.0
+   * *TATF is now developed/tested with PHP 8.2.*
 
- * Mediawiki >= 1.35
+ * Mediawiki >= 1.37
    * *TATF is now developed/tested with MW 1.39.
      See [Known Bugs](#known-bugs) for possible issues with newer versions.*
 
@@ -209,14 +210,17 @@ your Tika server.  More details on the parameters follow below.
 
  * `$wgTikaAllTheFiles_QueryTimeoutSeconds`
    * integer, default value: `5`
-   * Specifies the timeout, in seconds, for a single Tika query.
+   * Specifies TATF's timeout, in seconds, for a single Tika query.
      TATF will abort a request (and possibly try again) if the Tika server
      does not respond within this many seconds.
+   * Note that this is different from Tika's own internal query timeout.
+     See [Tika Timeouts](#tika-timeouts) for suggestions on setting these
+     timeouts appropriately.
 
  * `$wgTikaAllTheFiles_QueryRetryCount`
    * integer, default value: `2`
    * Specifies the number of times TATF will retry a Tika query in the event
-     of timeouts/errors/etc.
+     of certain errors.
    * E.g., if zero, TATF will not retry after an initial failure.
 
  * `$wgTikaAllTheFiles_QueryRetryDelaySeconds`
@@ -239,6 +243,10 @@ your Tika server.  More details on the parameters follow below.
                         'content_strategy' => 'combine',
                         'content_composition' => 'text',
                         'metadata_strategy' => 'prefer_other',
+                        'ignore_content_service_errors' => false,
+                        'ignore_content_parsing_errors' => false,
+                        'ignore_metadata_service_errors' => false,
+                        'ignore_metadata_parsing_errors' => false,
                       ],
         '*' => 'defaults',
      ]
@@ -256,7 +264,8 @@ The effect of the built-in default profile configuration (shown above) is:
   (but only text, not metadata).
 * Text extraction will not use OCR.
 * The TATF handler will provide Tika-extracted metadata to display on
-  a file's File: page
+  a file's File: page.
+* Errors encountered while querying Tika will not be ignored.
 ```
 
 #### Another profile configuration example
@@ -363,6 +372,19 @@ A complete profile requires values for each of the following parameters:
    * `'prefer_tika'`: only use metadata provided by another handler if there
      is no Tika-extracted metadata
    * `'only_tika'`: don't use another handler's metadata at all
+ * `'ignore_metadata_service_errors'`: boolean
+ * `'ignore_metadata_parsing_errors'`: boolean
+ * `'ignore_content_service_errors'`: boolean
+ * `'ignore_content_parsing_errors'`: boolean
+    * For the above four boolean parameters, `metadata` refers to a context
+      where metadata is being requested, and `content` means a context where
+      extracted text content is being requested.
+    * Likewise, `parsing_errors` refers to problems Tika has in processing
+      a file; `service_errors` refers to problems communicating with the Tika
+      server altogether.
+    * When a parameter is `false`, errors in the given context become exceptions
+      thrown to the caller.  When `true`, errors are ignored and treated as if
+      Tika produced a valid, but empty, response.
 
 ### Metadata property processing
 
@@ -492,6 +514,31 @@ If you want to quickly fire up a Tika server to try it out:
 
 That should be enough to get a Tika server listening for queries at
 `http://localhost:9998`.
+
+<a name="tika-timeouts"/>
+
+### Tika Timeouts
+
+There are two overlapping timeouts involved in Tika queries:
+ * TATF has a `QueryTimeoutSeconds` parameter.  The timer starts when
+   TATF sends a query to the Tika server.  This sets the maximum time
+   that TATF (and thus MediaWiki) will block, waiting for a response
+   from Tika.
+ * The standard Tika server has its own `taskTimeoutMillis` parameter.
+   This limits the execution time of the subprocess that Tika assigns
+   to a query.  Once Tika starts processing a query, this is the
+   maximum time it will allow itself to spend on the query.
+
+You'll need to decide how long you are willing to let Tika analyze a
+file, and set both timeouts appropriately.  For metadata, Tika is very
+fast, and the limiting factor is likely just the time necessary to
+transfer large files into Tika.  On the other hand, text extraction
+with OCR (see below) can take multiple minutes.
+
+Note that if TATF's `QueryTimeoutSeconds` is less than Tika's own
+`taskTimeoutMillis`, then if TATF times out and gives up on a query,
+Tika will keep chugging along, unaware that any result it produces
+will ultimately be ignored.
 
 <a name="tesseract-tips"/>
 
