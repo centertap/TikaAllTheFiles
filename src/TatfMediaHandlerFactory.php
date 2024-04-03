@@ -173,10 +173,6 @@ class TatfMediaHandlerFactory extends MediaHandlerFactory {
     $mwMajorMinor = $matches[1];
 
     switch ( $mwMajorMinor ) {
-      case '1.35':
-      case '1.36':
-        return new WrappingMediaHandler_1_35( $this->core, $typeProfile,
-                                              $theirHandler );
       case '1.37':
       case '1.38':
       case '1.39':
