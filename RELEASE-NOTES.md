@@ -1,6 +1,6 @@
 # Release Notes
 
-## Version XXX
+## Version 2.0.0
 ***Upgrading***
    - This version requires MediaWiki >= 1.37 and PHP >= 8.1.
      The major number has changed due to these new system requirements.
