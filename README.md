@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> This project has moved to codeberg.org:  https://codeberg.org/centertap/TikaAllTheFiles
+>
+> GitHub has become too much of a liability.  See [Give up GitHub](https://GiveUpGitHub.org) for some reasons, and add "occasionally having developer accounts locked out and vanished with no explanation" to the list.
+>
+> (FWIW, we do not consent to GitHub's use of this project's code in Copilot, and we never have.)
+
 # Tika All The Files!
 
 **TikaAllTheFiles** (TATF) is an extension for
